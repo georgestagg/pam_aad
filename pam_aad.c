@@ -20,7 +20,7 @@
 #define HOST "https://login.microsoftonline.com/"
 #define RESOURCE "https://graph.microsoft.com/"
 #define SUBJECT "Your one-time passcode for signing in via Azure Active Directory"
-#define TTW 5                   /* time to wait in seconds */
+#define TTW 1                   /* time to wait in seconds */
 #define USER_AGENT "azure_authenticator_pam/1.0"
 #define USER_PROMPT "Enter the code at https://aka.ms/devicelogin."
 #define USER_PROMPT_ENTER "Enter the code at https://aka.ms/devicelogin, then press enter."
@@ -205,9 +205,6 @@ STATIC void auth_bearer_request(struct ret_data *data,
     post_body = sdscat(post_body, "&grant_type=device_code");
 
     for (;;) {
-        nanosleep((const struct timespec[]) { {
-                  TTW, 0}
-                  }, NULL);
         json_data = curl(endpoint, post_body, NULL, debug);
 
         if (json_object_get(json_data, "access_token")) {
@@ -222,6 +219,9 @@ STATIC void auth_bearer_request(struct ret_data *data,
         if (strcmp(auth_bearer, AUTH_ERROR) != 0)
             break;
 
+        nanosleep((const struct timespec[]) { {
+                  TTW, 0}
+                  }, NULL);
     }
 
     sdsfree(endpoint);
