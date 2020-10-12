@@ -313,7 +313,8 @@ STATIC int verify_group(const char *auth_token, const char *group_id,
     return ret;
 }
 
-STATIC int notify_user(const char *to_addr, const char *from_addr, const char *message, const char *smtp_server, bool debug)
+STATIC int notify_user(const char *to_addr, const char *from_addr,
+    const char *message, const char *smtp_server, bool smtp_ssl, bool debug)
 {
     CURL *curl;
     CURLcode res = CURLE_OK;
@@ -352,7 +353,11 @@ STATIC int notify_user(const char *to_addr, const char *from_addr, const char *m
 
     curl = curl_easy_init();
     if (curl) {
-        curl_easy_setopt(curl, CURLOPT_USE_SSL, (long) CURLUSESSL_ALL);
+        if (smtp_ssl){
+            curl_easy_setopt(curl, CURLOPT_USE_SSL, (long) CURLUSESSL_ALL);
+        } else {
+            curl_easy_setopt(curl, CURLOPT_USE_SSL, (long) CURLUSESSL_NONE);
+        }
         curl_easy_setopt(curl, CURLOPT_URL, smtp_url);
         curl_easy_setopt(curl, CURLOPT_MAIL_FROM, from_addr);
         recipients = curl_slist_append(recipients, to_addr);
@@ -383,6 +388,7 @@ STATIC int azure_authenticator(pam_handle_t * pamh, const char *user)
 {
     jwt_t *jwt;
     bool enable_email = false;
+    bool smtp_ssl = true;
     bool debug = DEBUG;
     const char *client_id, *group_id, *tenant,
         *domain, *u_code, *d_code, *ab_token, *tenant_addr, *smtp_server;
@@ -459,6 +465,9 @@ STATIC int azure_authenticator(pam_handle_t * pamh, const char *user)
         if(strcmp(json_string_value(json_object_get(config, "email")),"true") == 0)
             enable_email = true;
 
+    if (json_object_get(config, "smtp_ssl"))
+        if(strcmp(json_string_value(json_object_get(config, "smtp_ssl")),"false") == 0)
+            smtp_ssl = false;
 
     sds user_addr = sdsnew(user);
     user_addr = sdscat(user_addr, "@");
@@ -478,7 +487,7 @@ STATIC int azure_authenticator(pam_handle_t * pamh, const char *user)
     if(enable_email){
         prompt = sdscat(prompt, USER_PROMPT);
         prompt = sdscat(prompt, "\n");
-        notify_user(user_addr, tenant_addr, prompt, smtp_server, debug);
+        notify_user(user_addr, tenant_addr, prompt, smtp_server, smtp_ssl, debug);
     } else {
         prompt = sdscat(prompt, USER_PROMPT_ENTER);
         prompt = sdscat(prompt, "\n");
